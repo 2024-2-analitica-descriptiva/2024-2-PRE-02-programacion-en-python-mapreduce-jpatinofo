@@ -23,8 +23,15 @@ from itertools import groupby
 #     ('text2.txt'. 'hypotheses.')
 #   ]
 #
-def load_input(input_directory):
+def load_input(input_directory) -> list[tuple[str]]:
     """Funcion load_input"""
+
+    files: list[str] = glob.glob(f"{input_directory}/*")
+    sequence = []
+    with fileinput.input(files=files) as f:
+        for line in f:
+            sequence.append((fileinput.filename(), line.strip()))
+    return sequence
 
 
 #
@@ -32,8 +39,21 @@ def load_input(input_directory):
 # función anterior y retorna una lista de tuplas (clave, valor). Esta función
 # realiza el preprocesamiento de las líneas de texto,
 #
-def line_preprocessing(sequence):
+def line_preprocessing(sequence) -> list[tuple[str]]:
     """Line Preprocessing"""
+
+    characters_to_remove: list[str] = [",", ".", "!", "?", "(", ")", ":", ";", "\n"]
+
+    translation_table: dict[int, int | None] = str.maketrans(
+        "", "", "".join(characters_to_remove)
+    )
+
+    sequence: list[tuple[str]] = [
+        (file_name, line.translate(translation_table).lower())
+        for file_name, line in sequence
+    ]
+
+    return sequence
 
 
 #
@@ -48,8 +68,14 @@ def line_preprocessing(sequence):
 #     ...
 #   ]
 #
-def mapper(sequence):
+def mapper(sequence) -> list[tuple[str, int]]:
     """Mapper"""
+
+    sequence: list[tuple[str]] = [
+        (word, 1) for _, line in sequence for word in line.split()
+    ]
+
+    return sequence
 
 
 #
@@ -63,8 +89,10 @@ def mapper(sequence):
 #     ...
 #   ]
 #
-def shuffle_and_sort(sequence):
+def shuffle_and_sort(sequence) -> list[tuple[str, int]]:
     """Shuffle and Sort"""
+
+    return sorted(sequence, key=lambda x: x[0])
 
 
 #
@@ -73,16 +101,28 @@ def shuffle_and_sort(sequence):
 # ejemplo, la reducción indica cuantas veces aparece la palabra analytics en el
 # texto.
 #
-def reducer(sequence):
+def reducer(sequence) -> list[tuple[str, int]]:
     """Reducer"""
+
+    sequence: list[tuple[str, int]] = [
+        (key, len(list(group))) for key, group in groupby(sequence, key=lambda x: x[0])
+    ]
+
+    return sequence
 
 
 #
 # Escriba la función create_ouptput_directory que recibe un nombre de
 # directorio y lo crea. Si el directorio existe, lo borra
 #
-def create_ouptput_directory(output_directory):
+def create_ouptput_directory(output_directory) -> None:
     """Create Output Directory"""
+    if os.path.exists(output_directory):
+        for file in glob.glob(f"{output_directory}/*"):
+            os.remove(file)
+        os.rmdir(output_directory)
+
+    os.mkdir(output_directory)
 
 
 #
@@ -95,6 +135,11 @@ def create_ouptput_directory(output_directory):
 #
 def save_output(output_directory, sequence):
     """Save Output"""
+    with open(f"{output_directory}/part-00000", "w", encoding="utf-8") as f:
+        for key, value in sequence:
+            f.write(f"{key}\t{value}\n")
+
+        f.close()
 
 
 #
@@ -103,6 +148,8 @@ def save_output(output_directory, sequence):
 #
 def create_marker(output_directory):
     """Create Marker"""
+    with open(f"{output_directory}/_SUCCESS", "w", encoding="utf-8") as f:
+        f.close()
 
 
 #
@@ -110,10 +157,18 @@ def create_marker(output_directory):
 #
 def run_job(input_directory, output_directory):
     """Job"""
+    file_array: list[tuple[str]] = load_input(input_directory=input_directory)
+    file_array_processed: list[tuple[str]] = line_preprocessing(sequence=file_array)
+    file_array_mapped: list[tuple[str]] = mapper(sequence=file_array_processed)
+    file_shuffle: list[tuple[str, int]] = shuffle_and_sort(sequence=file_array_mapped)
+    file_reducer: list[tuple[str, int]] = reducer(sequence=file_shuffle)
+    create_ouptput_directory(output_directory=output_directory)
+    save_output(output_directory=output_directory, sequence=file_reducer)
+    create_marker(output_directory=output_directory)
 
 
 if __name__ == "__main__":
     run_job(
-        "input",
-        "output",
+        "files/input",
+        "files/output",
     )
